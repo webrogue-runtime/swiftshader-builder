@@ -1,0 +1,58 @@
+
+name: build
+
+on:
+  schedule:
+    - cron: "0 0 * * 0"
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # # Comment/uncomment depending on presence of required SDK in runner's image
+      # - name: Install Windows SDK
+      #   shell: cmd
+      #   run: |
+      #     "C:\Program Files (x86)\Microsoft Visual Studio\Installer\vs_installer.exe" modify --installPath "C:\Program Files\Microsoft Visual Studio\2022\Enterprise" --quiet --force --norestart --add Microsoft.VisualStudio.Component.Windows11SDK.26100
+
+      - name: Build
+        run: ./build_windows.ps1
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: artifacts_windows
+          path: |
+            artifacts/x64.zip
+  
+  release:
+    runs-on: ubuntu-slim
+    permissions:
+      contents: write
+    needs: [build-windows]
+    steps:
+
+    - uses: actions/download-artifact@v4
+      with: 
+        name: artifacts_windows
+        path: artifacts_windows
+      
+    - name: make artifacts
+      run: |
+        mkdir artifacts
+        cp artifacts_windows/x64.zip artifacts/windows_x64.zip
+
+    - uses: ncipollo/release-action@v1
+      with:
+        artifacts: "artifacts/*.zip"
+        name:  Continuous build
+        allowUpdates: true
+        tag: latest_build
+        commit: ${{ github.ref }}
+        makeLatest: true
